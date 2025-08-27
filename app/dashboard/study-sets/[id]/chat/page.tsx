@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import Link from "next/link"
 import { ArrowLeft, Send, MessageCircle, Sparkles, Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
 
 interface Message {
   id: string
@@ -28,7 +28,9 @@ interface StudySet {
   }>
 }
 
-export default function StudySetChatPage({ params }: { params: { id: string } }) {
+export default function StudySetChatPage() {
+  const params = useParams<{ id: string }>()
+  const id = params.id
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -77,7 +79,7 @@ export default function StudySetChatPage({ params }: { params: { id: string } })
           back_text
         )
       `)
-      .eq("id", params.id)
+      .eq("id", id)
       .eq("user_id", user.id)
       .single()
 
@@ -94,17 +96,23 @@ export default function StudySetChatPage({ params }: { params: { id: string } })
   }
 
   const generateAIResponse = async (userMessage: string, context: string) => {
-    // Simulate AI response - in a real app, you'd call an AI API
-    await new Promise((resolve) => setTimeout(resolve, 1000 + Math.random() * 2000))
+    // Call server-side AI endpoint that uses LLM + optional web search
+    const res = await fetch(`/api/ai-chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: userMessage, studySetId: id, useWeb: true }),
+    })
 
-    const responses = [
-      `Great question about "${userMessage}"! Based on your study material, here's a detailed explanation: This concept is fundamental to understanding ${studySet?.title}. Let me break it down for you step by step...`,
-      `I can help clarify that! In the context of ${studySet?.title}, this topic relates to several key concepts from your flashcards. Here's what you need to know...`,
-      `That's an excellent question! This is actually covered in your study set. Let me provide a comprehensive explanation that will help you understand this better...`,
-      `Good thinking! This concept is important for mastering ${studySet?.title}. Here's a detailed breakdown that should clear up any confusion...`,
-    ]
+    if (!res.ok) {
+      throw new Error("Failed to get AI response")
+    }
 
-    return responses[Math.floor(Math.random() * responses.length)]
+    const data = await res.json()
+    const sources = Array.isArray(data.sources) && data.sources.length
+      ? `\n\nSources:\n${data.sources.map((s: any, i: number) => `${i + 1}. ${s.title} - ${s.url}`).join("\n")}`
+      : ""
+
+    return `${data.answer || "I couldn't formulate an answer."}${sources}`
   }
 
   const handleSendMessage = async () => {
@@ -185,7 +193,7 @@ export default function StudySetChatPage({ params }: { params: { id: string } })
 
         if (!error) {
           alert(`Successfully generated ${newFlashcards.length} new flashcards from your chat!`)
-          router.push(`/dashboard/study-sets/${params.id}`)
+          router.push(`/dashboard/study-sets/${id}`)
         } else {
           throw error
         }
@@ -214,7 +222,7 @@ export default function StudySetChatPage({ params }: { params: { id: string } })
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Button asChild variant="ghost" size="sm">
-              <Link href={`/dashboard/study-sets/${params.id}`}>
+              <Link href={`/dashboard/study-sets/${id}`}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Study Set
               </Link>

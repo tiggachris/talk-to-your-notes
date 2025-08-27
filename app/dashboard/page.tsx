@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
-import { Plus, BookOpen, Clock, Users, MoreVertical } from "lucide-react"
+import { Plus, BookOpen, Clock, Users, MoreVertical, MessageCircle } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 interface StudySet {
@@ -14,6 +14,24 @@ interface StudySet {
   is_public: boolean
   created_at: string
   flashcard_count: number
+}
+
+async function deleteStudySet(formData: FormData) {
+  "use server"
+  const id = formData.get("id") as string
+  if (!id) return
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
+  if (userError || !user) {
+    redirect("/auth/login")
+  }
+
+  await supabase.from("study_sets").delete().eq("id", id)
+  redirect("/dashboard")
 }
 
 export default async function DashboardPage() {
@@ -56,7 +74,7 @@ export default async function DashboardPage() {
             <div className="bg-blue-600 p-2 rounded-lg">
               <BookOpen className="h-6 w-6 text-white" />
             </div>
-            <span className="text-xl font-bold text-gray-900">StudyMaster</span>
+            <span className="text-xl font-bold text-gray-900">TalkToYourNotes</span>
           </div>
           <div className="flex items-center space-x-4">
             <Button asChild className="bg-blue-600 hover:bg-blue-700">
@@ -124,7 +142,12 @@ export default async function DashboardPage() {
                         <DropdownMenuItem asChild>
                           <Link href={`/dashboard/study-sets/${studySet.id}/study`}>Study</Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem className="text-red-600">Delete</DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <form action={deleteStudySet}>
+                            <input type="hidden" name="id" value={studySet.id} />
+                            <button type="submit" className="w-full text-left text-red-600">Delete</button>
+                          </form>
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -153,9 +176,17 @@ export default async function DashboardPage() {
                         "Private"
                       )}
                     </Badge>
-                    <Button asChild size="sm" variant="outline">
-                      <Link href={`/dashboard/study-sets/${studySet.id}/study`}>Study</Link>
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={`/dashboard/study-sets/${studySet.id}/study`}>Study</Link>
+                      </Button>
+                      <Button asChild size="sm" className="bg-purple-600 hover:bg-purple-700 text-white">
+                        <Link href={`/dashboard/study-sets/${studySet.id}/chat`}>
+                          <MessageCircle className="h-4 w-4 mr-1" />
+                          Clear Your Doubts
+                        </Link>
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

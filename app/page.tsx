@@ -12,7 +12,7 @@ export default function HomePage() {
             <div className="bg-blue-600 p-2 rounded-lg">
               <BookOpen className="h-6 w-6 text-white" />
             </div>
-            <span className="text-xl font-bold text-gray-900">StudyMaster</span>
+            <span className="text-xl font-bold text-gray-900">TalkToYourNotes</span>
           </div>
           <div className="flex items-center space-x-4">
             <Button asChild variant="ghost">
@@ -136,9 +136,9 @@ export default function HomePage() {
             <div className="bg-blue-600 p-2 rounded-lg">
               <BookOpen className="h-5 w-5 text-white" />
             </div>
-            <span className="text-lg font-bold">StudyMaster</span>
+            <span className="text-lg font-bold">TalkToYourNotes</span>
           </div>
-          <p className="text-gray-400">© 2024 StudyMaster. Empowering learners worldwide.</p>
+          <p className="text-gray-400">© 2024 TalkToYourNotes. Empowering learners worldwide.</p>
         </div>
       </footer>
     </div>

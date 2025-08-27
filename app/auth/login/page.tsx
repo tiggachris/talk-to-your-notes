@@ -26,13 +26,21 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      console.log("Attempting to sign in with:", email)
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
+      
+      console.log("Sign in response:", { data, error })
+      
       if (error) throw error
-      router.push("/dashboard")
+      
+      console.log("Sign in successful, redirecting to dashboard")
+      router.replace("/dashboard")
+      router.refresh() // Force a refresh to update the navigation state
     } catch (error: unknown) {
+      console.error("Login error:", error)
       setError(error instanceof Error ? error.message : "An error occurred")
     } finally {
       setIsLoading(false)
@@ -48,7 +56,7 @@ export default function LoginPage() {
               <BookOpen className="h-8 w-8 text-white" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">StudyMaster</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">TalkToYourNotes</h1>
           <p className="text-gray-600">Welcome back to your learning journey</p>
         </div>
 

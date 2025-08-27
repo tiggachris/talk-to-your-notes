@@ -37,7 +37,7 @@ export default function SetupPage() {
           <Database className="w-16 h-16 text-blue-600 mx-auto mb-4" />
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Database Setup Required</h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Welcome to StudyMaster! Before you can start creating study sets and uploading files, we need to set up your
+            Welcome to TalkToYourNotes! Before you can start creating study sets and uploading files, we need to set up your
             database tables.
           </p>
         </div>

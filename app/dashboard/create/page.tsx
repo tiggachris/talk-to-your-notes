@@ -95,7 +95,7 @@ export default function CreateStudySetPage() {
               <div className="bg-blue-600 p-2 rounded-lg">
                 <BookOpen className="h-6 w-6 text-white" />
               </div>
-              <span className="text-xl font-bold text-gray-900">StudyMaster</span>
+              <span className="text-xl font-bold text-gray-900">TalkToYourNotes</span>
             </div>
           </div>
         </div>

@@ -60,7 +60,7 @@ export default function DashboardLayout({
             <div className="flex items-center">
               <Link href="/dashboard" className="flex items-center space-x-2">
                 <BookOpen className="h-8 w-8 text-blue-600" />
-                <span className="text-xl font-bold text-gray-900">StudyMaster</span>
+                <span className="text-xl font-bold text-gray-900">TalkToYourNotes</span>
               </Link>
             </div>
             <div className="flex items-center space-x-4">
