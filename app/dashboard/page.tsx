@@ -83,11 +83,6 @@ export default async function DashboardPage() {
                 New Study Set
               </Link>
             </Button>
-            <form action="/auth/signout" method="post">
-              <Button variant="outline" type="submit">
-                Sign Out
-              </Button>
-            </form>
           </div>
         </div>
       </header>

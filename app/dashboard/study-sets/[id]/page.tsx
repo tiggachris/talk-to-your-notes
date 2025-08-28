@@ -1,10 +1,13 @@
-import { redirect } from "next/navigation"
-import { createClient } from "@/lib/supabase/server"
+"use client"
+
+import { useState, useEffect } from "react"
+import { useRouter, useParams } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
-import { ArrowLeft, BookOpen, Edit, Play, Users, Clock, Plus, MessageCircle } from "lucide-react"
+import { ArrowLeft, BookOpen, Edit, Play, Users, Clock, Plus, MessageCircle, Trash2, Loader2 } from "lucide-react"
 
 interface StudySetWithFlashcards {
   id: string
@@ -20,47 +23,104 @@ interface StudySetWithFlashcards {
   }>
 }
 
-export default async function StudySetDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
-  const { id } = await params
-  const supabase = await createClient()
+export default function StudySetDetailPage() {
+  const params = useParams<{ id: string }>()
+  const router = useRouter()
+  const id = params.id
+  
+  const [studySet, setStudySet] = useState<StudySetWithFlashcards | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [deletingCardId, setDeletingCardId] = useState<string | null>(null)
+  const supabase = createClient()
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser()
-  if (userError || !user) {
-    redirect("/auth/login")
+  useEffect(() => {
+    loadStudySet()
+  }, [id])
+
+  const loadStudySet = async () => {
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser()
+      if (userError || !user) {
+        router.push("/auth/login")
+        return
+      }
+
+      // Get study set with flashcards
+      const { data: studySetData, error: studySetError } = await supabase
+        .from("study_sets")
+        .select(`
+          id,
+          title,
+          description,
+          is_public,
+          created_at,
+          flashcards (
+            id,
+            front_text,
+            back_text,
+            created_at
+          )
+        `)
+        .eq("id", id)
+        .eq("user_id", user.id)
+        .single()
+
+      if (studySetError || !studySetData) {
+        router.push("/dashboard")
+        return
+      }
+
+      setStudySet(studySetData as StudySetWithFlashcards)
+    } catch (error) {
+      console.error("Error loading study set:", error)
+      router.push("/dashboard")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  // Get study set with flashcards
-  const { data: studySet, error: studySetError } = await supabase
-    .from("study_sets")
-    .select(`
-      id,
-      title,
-      description,
-      is_public,
-      created_at,
-      flashcards (
-        id,
-        front_text,
-        back_text,
-        created_at
-      )
-    `)
-    .eq("id", id)
-    .eq("user_id", user.id)
-    .single()
+  const deleteFlashcard = async (flashcardId: string) => {
+    if (!studySet) return
+    
+    setDeletingCardId(flashcardId)
+    try {
+      const { error } = await supabase
+        .from("flashcards")
+        .delete()
+        .eq("id", flashcardId)
 
-  if (studySetError || !studySet) {
-    redirect("/dashboard")
+      if (error) throw error
+
+      // Update local state
+      setStudySet({
+        ...studySet,
+        flashcards: studySet.flashcards.filter(card => card.id !== flashcardId)
+      })
+    } catch (error) {
+      console.error("Error deleting flashcard:", error)
+      alert("Failed to delete flashcard. Please try again.")
+    } finally {
+      setDeletingCardId(null)
+    }
   }
 
-  const typedStudySet = studySet as StudySetWithFlashcards
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading study set...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!studySet) {
+    return null
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
@@ -103,22 +163,22 @@ export default async function StudySetDetailPage({
         <div className="mb-8">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">{typedStudySet.title}</h1>
-              {typedStudySet.description && <p className="text-gray-600 text-lg">{typedStudySet.description}</p>}
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">{studySet.title}</h1>
+              {studySet.description && <p className="text-gray-600 text-lg">{studySet.description}</p>}
             </div>
           </div>
 
           <div className="flex items-center space-x-4 text-sm text-gray-500">
             <span className="flex items-center">
               <BookOpen className="h-4 w-4 mr-1" />
-              {typedStudySet.flashcards.length} cards
+              {studySet.flashcards.length} cards
             </span>
             <span className="flex items-center">
               <Clock className="h-4 w-4 mr-1" />
-              Created {new Date(typedStudySet.created_at).toLocaleDateString()}
+              Created {new Date(studySet.created_at).toLocaleDateString()}
             </span>
-            <Badge variant={typedStudySet.is_public ? "default" : "secondary"}>
-              {typedStudySet.is_public ? (
+            <Badge variant={studySet.is_public ? "default" : "secondary"}>
+              {studySet.is_public ? (
                 <>
                   <Users className="h-3 w-3 mr-1" />
                   Public
@@ -142,7 +202,7 @@ export default async function StudySetDetailPage({
             </Button>
           </div>
 
-          {typedStudySet.flashcards.length === 0 ? (
+          {studySet.flashcards.length === 0 ? (
             <Card className="text-center py-12">
               <CardContent>
                 <div className="bg-gray-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -160,13 +220,26 @@ export default async function StudySetDetailPage({
             </Card>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {typedStudySet.flashcards.map((flashcard, index) => (
+              {studySet.flashcards.map((flashcard, index) => (
                 <Card key={flashcard.id} className="hover:shadow-md transition-shadow">
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <Badge variant="outline" className="text-xs">
                         Card {index + 1}
                       </Badge>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteFlashcard(flashcard.id)}
+                        disabled={deletingCardId === flashcard.id}
+                        className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                      >
+                        {deletingCardId === flashcard.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -188,7 +261,7 @@ export default async function StudySetDetailPage({
         </div>
 
         {/* Study Actions */}
-        {typedStudySet.flashcards.length > 0 && (
+        {studySet.flashcards.length > 0 && (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card className="hover:shadow-md transition-shadow cursor-pointer">
               <CardHeader>

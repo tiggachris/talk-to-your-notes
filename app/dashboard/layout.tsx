@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { BookOpen, Upload, FileText, LogOut, Trophy, Bell, Download, Settings } from "lucide-react"
@@ -17,6 +17,14 @@ export default function DashboardLayout({
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
+  const pathname = usePathname()
+
+  const isActive = (path: string) => {
+    if (path === '/dashboard') {
+      return pathname === '/dashboard' || pathname.startsWith('/dashboard/study-sets')
+    }
+    return pathname.startsWith(path)
+  }
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -79,50 +87,67 @@ export default function DashboardLayout({
           <nav className="mt-8 px-4">
             <div className="space-y-2">
               <Link
-                href="/setup"
-                className="flex items-center px-4 py-2 text-orange-700 bg-orange-50 rounded-lg hover:bg-orange-100 border border-orange-200"
-              >
-                <Settings className="mr-3 h-5 w-5" />
-                Database Setup
-              </Link>
-              <Link
                 href="/dashboard"
-                className="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100"
+                className={`flex items-center px-4 py-2 rounded-lg hover:bg-gray-100 ${
+                  isActive('/dashboard') 
+                    ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700' 
+                    : 'text-gray-700'
+                }`}
               >
                 <BookOpen className="mr-3 h-5 w-5" />
                 Study Sets
               </Link>
               <Link
                 href="/dashboard/upload"
-                className="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100"
+                className={`flex items-center px-4 py-2 rounded-lg hover:bg-gray-100 ${
+                  isActive('/dashboard/upload') 
+                    ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700' 
+                    : 'text-gray-700'
+                }`}
               >
                 <Upload className="mr-3 h-5 w-5" />
                 Upload & Generate
               </Link>
               <Link
                 href="/dashboard/files"
-                className="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100"
+                className={`flex items-center px-4 py-2 rounded-lg hover:bg-gray-100 ${
+                  isActive('/dashboard/files') 
+                    ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700' 
+                    : 'text-gray-700'
+                }`}
               >
                 <FileText className="mr-3 h-5 w-5" />
                 Files
               </Link>
               <Link
                 href="/dashboard/quizzes"
-                className="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100"
+                className={`flex items-center px-4 py-2 rounded-lg hover:bg-gray-100 ${
+                  isActive('/dashboard/quizzes') 
+                    ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700' 
+                    : 'text-gray-700'
+                }`}
               >
                 <Trophy className="mr-3 h-5 w-5" />
                 Quiz History
               </Link>
               <Link
                 href="/dashboard/reminders"
-                className="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100"
+                className={`flex items-center px-4 py-2 rounded-lg hover:bg-gray-100 ${
+                  isActive('/dashboard/reminders') 
+                    ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700' 
+                    : 'text-gray-700'
+                }`}
               >
                 <Bell className="mr-3 h-5 w-5" />
                 Reminders
               </Link>
               <Link
                 href="/dashboard/export"
-                className="flex items-center px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100"
+                className={`flex items-center px-4 py-2 rounded-lg hover:bg-gray-100 ${
+                  isActive('/dashboard/export') 
+                    ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-700' 
+                    : 'text-gray-700'
+                }`}
               >
                 <Download className="mr-3 h-5 w-5" />
                 Import & Export

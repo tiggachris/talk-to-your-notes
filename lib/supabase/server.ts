@@ -3,8 +3,8 @@ import { cookies } from "next/headers"
 import type { CookieOptions } from "@supabase/ssr"
 
 export async function createClient() {
-  // cookies() is synchronous in Next.js App Router
-  const cookieStore = cookies()
+  // cookies() needs to be awaited in Next.js 15
+  const cookieStore = await cookies()
 
   return createSupabaseServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
