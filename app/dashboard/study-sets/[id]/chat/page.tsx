@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import Link from "next/link"
-import { ArrowLeft, Send, MessageCircle, Sparkles, Loader2 } from "lucide-react"
+import { ArrowLeft, Send, MessageCircle, Sparkles, Loader2, Star, StarOff } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter, useParams } from "next/navigation"
 
@@ -16,6 +16,8 @@ interface Message {
   role: "user" | "assistant"
   content: string
   timestamp: Date
+  isStarred?: boolean
+  starredId?: string
 }
 
 interface StudySet {
@@ -36,22 +38,63 @@ export default function StudySetChatPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [studySet, setStudySet] = useState<StudySet | null>(null)
   const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false)
+  const [starringMessageId, setStarringMessageId] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
   useEffect(() => {
     fetchStudySet()
-    // Add welcome message
-    setMessages([
-      {
-        id: "1",
-        role: "assistant",
-        content:
-          "Hi! I'm here to help you understand your study material better. Ask me anything about the topics in this study set, and I'll provide detailed explanations to clear your doubts!",
-        timestamp: new Date(),
-      },
-    ])
+    loadChatHistory()
   }, [])
+
+  const loadChatHistory = async () => {
+    try {
+      const response = await fetch(`/api/chat-messages?studySetId=${id}`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.messages && data.messages.length > 0) {
+          const formattedMessages = data.messages.map((msg: any) => {
+            // Check if message is starred in localStorage
+            const starredKey = `starred_${msg.id}`
+            const isStarred = localStorage.getItem(starredKey) !== null
+            
+            return {
+              id: msg.id,
+              role: msg.role,
+              content: msg.content,
+              timestamp: new Date(msg.created_at),
+              isStarred: isStarred,
+              starredId: isStarred ? starredKey : undefined
+            }
+          })
+          setMessages(formattedMessages)
+        } else {
+          // Add welcome message if no chat history
+          setMessages([
+            {
+              id: "welcome",
+              role: "assistant",
+              content:
+                "Hi! I'm here to help you understand your study material better. Ask me anything about the topics in this study set, and I'll provide detailed explanations to clear your doubts!",
+              timestamp: new Date(),
+            },
+          ])
+        }
+      }
+    } catch (error) {
+      console.error("Error loading chat history:", error)
+      // Add welcome message on error
+      setMessages([
+        {
+          id: "welcome",
+          role: "assistant",
+          content:
+            "Hi! I'm here to help you understand your study material better. Ask me anything about the topics in this study set, and I'll provide detailed explanations to clear your doubts!",
+          timestamp: new Date(),
+        },
+      ])
+    }
+  }
 
   useEffect(() => {
     scrollToBottom()
@@ -95,6 +138,62 @@ export default function StudySetChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
+  const saveMessage = async (role: "user" | "assistant", content: string) => {
+    try {
+      await fetch('/api/chat-messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studySetId: id,
+          role,
+          content,
+        }),
+      })
+    } catch (error) {
+      console.error('Error saving message:', error)
+    }
+  }
+
+  const toggleStarMessage = async (message: Message, userQuestion?: string) => {
+    if (message.role !== 'assistant') return
+    
+    setStarringMessageId(message.id)
+    
+    try {
+      const starredKey = `starred_${message.id}`
+      const isCurrentlyStarred = localStorage.getItem(starredKey)
+      
+      if (isCurrentlyStarred) {
+        // Unstar the message
+        localStorage.removeItem(starredKey)
+        setMessages(prev => prev.map(msg => 
+          msg.id === message.id 
+            ? { ...msg, isStarred: false, starredId: undefined }
+            : msg
+        ))
+      } else {
+        // Star the message
+        const starredData = {
+          messageContent: message.content,
+          question: userQuestion || 'Question not available',
+          studySetId: id,
+          studySetTitle: studySet?.title || 'Unknown Study Set',
+          timestamp: new Date().toISOString()
+        }
+        localStorage.setItem(starredKey, JSON.stringify(starredData))
+        setMessages(prev => prev.map(msg => 
+          msg.id === message.id 
+            ? { ...msg, isStarred: true, starredId: starredKey }
+            : msg
+        ))
+      }
+    } catch (error) {
+      console.error('Error toggling star:', error)
+    } finally {
+      setStarringMessageId(null)
+    }
+  }
+
   const generateAIResponse = async (userMessage: string, context: string) => {
     // Call server-side AI endpoint that uses LLM + optional web search
     const res = await fetch(`/api/ai-chat`, {
@@ -125,9 +224,13 @@ export default function StudySetChatPage() {
       timestamp: new Date(),
     }
 
+    const userQuestion = input.trim()
     setMessages((prev) => [...prev, userMessage])
     setInput("")
     setIsLoading(true)
+
+    // Save user message
+    await saveMessage("user", userMessage.content)
 
     try {
       const context =
@@ -143,6 +246,9 @@ export default function StudySetChatPage() {
       }
 
       setMessages((prev) => [...prev, assistantMessage])
+      
+      // Save assistant message
+      await saveMessage("assistant", assistantMessage.content)
     } catch (error) {
       console.error("Error generating response:", error)
       const errorMessage: Message = {
@@ -152,6 +258,9 @@ export default function StudySetChatPage() {
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, errorMessage])
+      
+      // Save error message
+      await saveMessage("assistant", errorMessage.content)
     } finally {
       setIsLoading(false)
     }
@@ -263,20 +372,48 @@ export default function StudySetChatPage() {
           </CardHeader>
           <CardContent className="flex-1 overflow-hidden flex flex-col">
             <div className="flex-1 overflow-y-auto space-y-4 mb-4">
-              {messages.map((message) => (
-                <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div
-                    className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                      message.role === "user" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900"
-                    }`}
-                  >
-                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                    <p className={`text-xs mt-1 ${message.role === "user" ? "text-blue-100" : "text-gray-500"}`}>
-                      {message.timestamp.toLocaleTimeString()}
-                    </p>
+              {messages.map((message, index) => {
+                const previousMessage = index > 0 ? messages[index - 1] : null
+                const userQuestion = previousMessage?.role === 'user' ? previousMessage.content : undefined
+                
+                return (
+                  <div key={message.id} className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+                    <div className={`flex items-start space-x-2 max-w-[80%] ${
+                      message.role === "user" ? "flex-row-reverse space-x-reverse" : ""
+                    }`}>
+                      <div
+                        className={`rounded-lg px-4 py-2 ${
+                          message.role === "user" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-900"
+                        }`}
+                      >
+                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                        <p className={`text-xs mt-1 ${message.role === "user" ? "text-blue-100" : "text-gray-500"}`}>
+                          {message.timestamp.toLocaleTimeString()}
+                        </p>
+                      </div>
+                      
+                      {/* Star button for assistant messages */}
+                      {message.role === "assistant" && message.id !== "welcome" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 hover:bg-yellow-50"
+                          onClick={() => toggleStarMessage(message, userQuestion)}
+                          disabled={starringMessageId === message.id}
+                        >
+                          {starringMessageId === message.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : message.isStarred ? (
+                            <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                          ) : (
+                            <StarOff className="h-4 w-4 text-gray-400 hover:text-yellow-500" />
+                          )}
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
               {isLoading && (
                 <div className="flex justify-start">
                   <div className="bg-gray-100 rounded-lg px-4 py-2">

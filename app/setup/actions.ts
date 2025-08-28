@@ -79,6 +79,31 @@ CREATE TABLE IF NOT EXISTS public.study_reminders (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Create chat_messages table for storing conversation history
+CREATE TABLE IF NOT EXISTS public.chat_messages (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  study_set_id UUID REFERENCES public.study_sets(id) ON DELETE CASCADE NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+  content TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create starred_messages table for storing user's starred AI responses
+CREATE TABLE IF NOT EXISTS public.starred_messages (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  study_set_id UUID REFERENCES public.study_sets(id) ON DELETE CASCADE NOT NULL,
+  message_content TEXT NOT NULL,
+  question TEXT NOT NULL,
+  study_set_title TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_chat_messages_user_study_set ON public.chat_messages(user_id, study_set_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_starred_messages_user ON public.starred_messages(user_id, created_at DESC);}]}}}
+
 -- Enable RLS on all tables
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.study_sets ENABLE ROW LEVEL SECURITY;
@@ -86,6 +111,8 @@ ALTER TABLE public.flashcards ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.uploaded_files ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.quiz_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.study_reminders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.starred_messages ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policies
 CREATE POLICY "Users can view own profile" ON public.profiles FOR SELECT USING (auth.uid() = id);
@@ -121,6 +148,16 @@ CREATE POLICY "Users can create own quiz attempts" ON public.quiz_attempts FOR I
 
 CREATE POLICY "Users can view own reminders" ON public.study_reminders FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can manage own reminders" ON public.study_reminders FOR ALL USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can view own chat messages" ON public.chat_messages FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can create own chat messages" ON public.chat_messages FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own chat messages" ON public.chat_messages FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own chat messages" ON public.chat_messages FOR DELETE USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can view own starred messages" ON public.starred_messages FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can create own starred messages" ON public.starred_messages FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own starred messages" ON public.starred_messages FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own starred messages" ON public.starred_messages FOR DELETE USING (auth.uid() = user_id);}]}}}
 `
 
     // Execute schema creation

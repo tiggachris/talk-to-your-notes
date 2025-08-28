@@ -8,6 +8,9 @@ export const metadata: Metadata = {
   description: 'Talk to your notes. Create, quiz, and study smarter.',
   applicationName: 'TalkToYourNotes',
   generator: 'TalkToYourNotes',
+  icons: {
+    icon: '/favicon.ico',
+  },
 }
 
 export default function RootLayout({

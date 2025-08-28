@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { GoogleGenerativeAI } from "@google/generative-ai"
 
 // Optional: use Tavily for web search if TAVILY_API_KEY is set
 async function webSearch(query: string) {
@@ -123,15 +124,15 @@ export async function POST(req: Request) {
 
     const studyContext = makeStudyContext(pairs)
 
-    // If OpenAI API key is available, use LLM; otherwise fallback to simple retrieval
-    const openaiKey = process.env.OPENAI_API_KEY
+    // If Gemini API key is available, use LLM; otherwise fallback to simple retrieval
+    const geminiKey = process.env.GEMINI_API_KEY
 
     let webData: any = null
     if (useWeb) {
       webData = await webSearch(question)
     }
 
-    if (!openaiKey) {
+    if (!geminiKey) {
       // Fallback answer purely from study set
       const answer = fallbackAnswer(question, pairs)
       return NextResponse.json({ answer, sources: webData?.results?.map((r: any) => ({ title: r.title, url: r.url })) || [] })
@@ -144,7 +145,7 @@ export async function POST(req: Request) {
           .join("\n\n")
       : ""
 
-    const system = [
+    const systemPrompt = [
       "You are an expert study assistant.",
       "Answer the user's question clearly and concisely.",
       "First use the provided Study Set context; if insufficient, use the Web Sources if present.",
@@ -159,34 +160,27 @@ export async function POST(req: Request) {
       "\n\nInstructions: Use the study context first. When using web info, cite with [1], [2], etc., and list sources at the end.",
     ].join("")
 
-    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${openaiKey}`,
-      },
-      body: JSON.stringify({
-        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
-        temperature: 0.2,
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: userPrompt },
-        ],
-      }),
-    })
+    try {
+      // Initialize Gemini AI
+      const genAI = new GoogleGenerativeAI(geminiKey)
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
 
-    if (!resp.ok) {
-      const text = await resp.text()
-      return NextResponse.json({ answer: fallbackAnswer(question, pairs), note: "LLM error", details: text }, { status: 200 })
+      // Combine system prompt and user prompt for Gemini
+      const fullPrompt = `${systemPrompt}\n\n${userPrompt}`
+
+      const result = await model.generateContent(fullPrompt)
+      const response = await result.response
+      const answer = response.text() || fallbackAnswer(question, pairs)
+
+      return NextResponse.json({
+        answer,
+        sources: webData?.results?.map((r: any) => ({ title: r.title, url: r.url })) || [],
+      })
+    } catch (error) {
+      console.error("Gemini API error:", error)
+      const answer = fallbackAnswer(question, pairs)
+      return NextResponse.json({ answer, sources: webData?.results?.map((r: any) => ({ title: r.title, url: r.url })) || [], note: "AI error" }, { status: 200 })
     }
-
-    const dataJson = await resp.json()
-    const answer = dataJson?.choices?.[0]?.message?.content || fallbackAnswer(question, pairs)
-
-    return NextResponse.json({
-      answer,
-      sources: webData?.results?.map((r: any) => ({ title: r.title, url: r.url })) || [],
-    })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || "Unknown error" }, { status: 500 })
   }
