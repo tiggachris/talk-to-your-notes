@@ -30,19 +30,34 @@ export default function StarredNotesPage() {
 
   const loadStarredMessages = async () => {
     try {
+      // Get current user to filter starred messages
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        router.push('/auth/login')
+        return
+      }
+      
       const starred: StarredMessage[] = []
+      const userPrefix = `starred_${user.id}_`
+      
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i)
-        if (key?.startsWith('starred_')) {
+        // Only load starred messages for current user
+        if (key?.startsWith(userPrefix)) {
           const data = JSON.parse(localStorage.getItem(key) || '{}')
-          starred.push({
-            id: key.replace('starred_', ''),
-            message_content: data.messageContent,
-            question: data.question,
-            study_set_title: data.studySetTitle,
-            study_set_id: data.studySetId,
-            created_at: data.timestamp
-          })
+          // Additional validation: check if userId matches (for extra security)
+          if (data.userId === user.id) {
+            starred.push({
+              id: key.replace(userPrefix, ''),
+              message_content: data.messageContent,
+              question: data.question,
+              study_set_title: data.studySetTitle,
+              study_set_id: data.studySetId,
+              created_at: data.timestamp
+            })
+          }
         }
       }
       // Sort by timestamp, newest first
@@ -58,7 +73,16 @@ export default function StarredNotesPage() {
   const deleteStarredMessage = async (messageId: string) => {
     setDeletingId(messageId)
     try {
-      const starredKey = `starred_${messageId}`
+      // Get current user for user-specific key
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        console.error('User not authenticated')
+        return
+      }
+      
+      const starredKey = `starred_${user.id}_${messageId}`
       localStorage.removeItem(starredKey)
       setStarredMessages(prev => prev.filter(msg => msg.id !== messageId))
     } catch (error) {

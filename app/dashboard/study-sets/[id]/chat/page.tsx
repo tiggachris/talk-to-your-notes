@@ -49,14 +49,18 @@ export default function StudySetChatPage() {
 
   const loadChatHistory = async () => {
     try {
+      // Get current user for user-specific starred status
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      
       const response = await fetch(`/api/chat-messages?studySetId=${id}`)
       if (response.ok) {
         const data = await response.json()
         if (data.messages && data.messages.length > 0) {
           const formattedMessages = data.messages.map((msg: any) => {
-            // Check if message is starred in localStorage
-            const starredKey = `starred_${msg.id}`
-            const isStarred = localStorage.getItem(starredKey) !== null
+            // Check if message is starred in localStorage with user-specific key
+            const starredKey = user ? `starred_${user.id}_${msg.id}` : null
+            const isStarred = starredKey ? localStorage.getItem(starredKey) !== null : false
             
             return {
               id: msg.id,
@@ -160,7 +164,17 @@ export default function StudySetChatPage() {
     setStarringMessageId(message.id)
     
     try {
-      const starredKey = `starred_${message.id}`
+      // Get current user ID for user-specific storage
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      
+      if (!user) {
+        console.error('User not authenticated')
+        return
+      }
+      
+      // Create user-specific key to prevent cross-user data leakage
+      const starredKey = `starred_${user.id}_${message.id}`
       const isCurrentlyStarred = localStorage.getItem(starredKey)
       
       if (isCurrentlyStarred) {
@@ -178,7 +192,8 @@ export default function StudySetChatPage() {
           question: userQuestion || 'Question not available',
           studySetId: id,
           studySetTitle: studySet?.title || 'Unknown Study Set',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          userId: user.id // Store user ID for validation
         }
         localStorage.setItem(starredKey, JSON.stringify(starredData))
         setMessages(prev => prev.map(msg => 
@@ -397,16 +412,16 @@ export default function StudySetChatPage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 w-8 p-0 hover:bg-yellow-50"
+                          className="h-8 w-8 p-0 hover:bg-yellow-50 border border-gray-200 bg-white shadow-sm"
                           onClick={() => toggleStarMessage(message, userQuestion)}
                           disabled={starringMessageId === message.id}
                         >
                           {starringMessageId === message.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
                           ) : message.isStarred ? (
                             <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
                           ) : (
-                            <StarOff className="h-4 w-4 text-gray-400 hover:text-yellow-500" />
+                            <Star className="h-4 w-4 text-gray-400 hover:text-yellow-500" />
                           )}
                         </Button>
                       )}
